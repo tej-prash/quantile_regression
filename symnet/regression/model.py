@@ -16,8 +16,9 @@ from keras.utils.vis_utils import plot_model
 import seaborn as sns
 import matplotlib.pyplot as plt
 from keras.constraints import NonNeg
+from mlsquare.losses.keras import quantile_loss
 
-# path="./tests/EnergyEfficiency/suraj/sgd/trial_5"
+base_path="./tej_tests/CaliforniaHousing/method_3/q_0.95/"
 
 class RegressionModel(AbstractModel):
     """
@@ -80,7 +81,8 @@ class RegressionModel(AbstractModel):
         self.K_z=[]
         self.model = None
 
-        self.loss = 'mean_absolute_error'
+        self.quantile=0.95
+        self.loss = quantile_loss(quantile=self.quantile)
         self.metrics = ['mean_absolute_error']
 
         self.x_train = self.x_test = self.y_train = self.y_test = None
@@ -103,11 +105,11 @@ class RegressionModel(AbstractModel):
         # plt.savefig('./tests/method_14/dist_y_train_y_test.png')
 
         #Feature scaling on X and Y
-        self.scaler_x,self.scaler_y=tuple(map(normalize_fit,[self.x_train,self.y_train.reshape(-1,1)]))
-        self.x_train,self.y_train=tuple(map(normalize,[self.x_train,self.y_train.reshape(-1,1)],[self.scaler_x,self.scaler_y]))
-        self.x_test,self.y_test=tuple(map(normalize,[self.x_test,self.y_test.reshape(-1,1)],[self.scaler_x,self.scaler_y]))
+        self.scaler_x,self.scaler_y=tuple(map(normalize_fit,[self.x_train,self.y_train]))
+        self.x_train,self.y_train=tuple(map(normalize,[self.x_train,self.y_train],[self.scaler_x,self.scaler_y]))
+        self.x_test,self.y_test=tuple(map(normalize,[self.x_test,self.y_test],[self.scaler_x,self.scaler_y]))
         
-        print(self.x_train.shape)
+        print(self.y_train.shape)
 
     def _get_model(self):
         """
@@ -125,14 +127,16 @@ class RegressionModel(AbstractModel):
 
         x = Input(shape=(self.x_train.shape[1],))
         hidden_out_1=Dense(20)(x)
-        act_1 = CustomActivation(self.activation)(hidden_out_1)
-        y=Dense(1,activation='softsign')(act_1)
+        act_1 = CustomActivation(name=self.activation)(hidden_out_1)
+        hidden_out_2=Dense(15)(act_1)
+        act_2 = CustomActivation(name=self.activation)(hidden_out_2)        
+        y=Dense(self.y_train.shape[1],activation='softsign')(act_2)
 
         self.model = Model(inputs=x,outputs=y)
 
-        plot_model(self.model,to_file="./tej_tests/BostonHousing/model_img_2.png",show_shapes=True,show_layer_names=True)
+        # plot_model(self.model,to_file=base_path+"model_img.png",show_shapes=True,show_layer_names=True)
 
-        # self.model.load_weights('./tej_tests/CaliforniaHousing/method_26/random_state_42/model_constant.h5') 
+        self.model.load_weights(base_path+'model_constant.h5') 
 
         return self.model
 
@@ -189,12 +193,12 @@ class RegressionModel(AbstractModel):
 
         if(self.optimizer_name == 'sgd'):
             #Verify model weights
-            # if(epoch==0):
-            #     self.model.save_weights("./tej_tests/CaliforniaHousing/method_26/random_state_42/model_adaptive.h5")
+            if(epoch==0):
+                self.model.save_weights(base_path+"model_adaptive.h5")
 
 
             # if(epoch==0):
-            #     self.model.save_weights("./tej_tests/CaliforniaHousing/method_31/random_state_42/model_constant.h5")
+            #     self.model.save_weights(base_path+"model_constant.h5")
 
             # return 0.1
 
@@ -212,12 +216,11 @@ class RegressionModel(AbstractModel):
             #grads_func=K.function(inputs,grads)
 
             #Maximum Lipschitz constant
-            K_max=-1
+            K_max=-10000000
             for i in range(((len(self.x_train) - 1) // self.bs + 1)):
                 start_i=i*self.bs
                 end_i=start_i+self.bs
                 xb=self.x_train[start_i:end_i]
-                y=self.y_train[start_i:end_i]
                 if(len(self.model.layers)>2):  
                     ##Using the theoretical framework
                     # activ=np.linalg.norm(penultimate_activ_func([xb]),axis=0)
@@ -247,7 +250,7 @@ class RegressionModel(AbstractModel):
                 # evaluated_grads=grads_func([xb,y,weight_matrices])
                 # print(evaluated_grads)    
                 #print("kz is :",Kz)
-                L=Kz/float(self.bs)
+                L=(Kz * max(self.quantile,1-self.quantile))/float(self.bs)
                 if(L>K_max):
                     K_max=L
 
@@ -274,7 +277,7 @@ class RegressionModel(AbstractModel):
 
             #Verify model weights
             if(epoch==0):
-                self.model.save_weights(path+"/model_adaptive.h5")
+                self.model.save_weights(base_path+"/model_adaptive.h5")
 
 
             # if(epoch==0):
@@ -406,7 +409,7 @@ class RegressionModel(AbstractModel):
         Plots Kz
         :return: None
         """
-        with open("./tej_tests/CaliforniaHousing/method_26/random_state_42/K_values","a") as fp:
+        with open(base_path+"K_values","a") as fp:
             fp.write("K_z\n")
             for i in self.K_z:
                 fp.write(str(i)+"\n")
@@ -414,7 +417,7 @@ class RegressionModel(AbstractModel):
         plt.xlabel("Iteration")
         plt.ylabel("K_z")
         plt.title("K_z over time")
-        plt.savefig("./tej_tests/CaliforniaHousing/method_26/random_state_42/K_values.png")
+        plt.savefig(base_path+"K_values.png")
 
     # def calculate_loss(self,x:np.ndarray,y:np.ndarray):
     #     """

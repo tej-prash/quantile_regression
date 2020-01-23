@@ -5,7 +5,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 
-# path="./tests/EnergyEfficiency/suraj/sgd/trial_1"
+base_path="./tej_tests/CaliforniaHousing/method_3/q_0.95/"
 
 class AbstractModel:
     """
@@ -119,10 +119,9 @@ class AbstractModel:
         self.model = self._get_model()
 
         lr_scheduler = LearningRateScheduler(self._lr_schedule)
-        # csv_logger=CSVLogger(filename='./tej_tests/CaliforniaHousing/method_31/random_state_42/training_0.1.log',append='True')
+        csv_logger=CSVLogger(filename=base_path+'training_adaptive.log',append='True')
 
-        # Prepare callbacks for model saving and for learning rate adjustme
-        # nt.
+        # Prepare callbacks for model saving and for learning rate adjustment.
         save_dir = os.path.join(os.getcwd(), 'saved_models')
         model_name = 'model.{epoch:03d}.h5'
 
@@ -135,13 +134,13 @@ class AbstractModel:
                                      monitor='val_acc',
                                      verbose=1,
                                      save_best_only=True)
-        print("self.optimizer",self.optimizer)
+        print("self.optimizer",self.optimizer,self.loss)
         self.model.compile(self.optimizer, loss=self.loss, metrics=self.metrics)
 
 
         if finish_fit:
             self.model.fit(self.x_train, self.y_train, validation_data=(self.x_test, self.y_test), epochs=self.epochs,
-                           batch_size=self.bs, shuffle=True, callbacks=[lr_scheduler, checkpoint])
+                           batch_size=self.bs, shuffle=True, callbacks=[lr_scheduler, checkpoint,csv_logger])
 
     def predict(self, x: np.ndarray):
         """

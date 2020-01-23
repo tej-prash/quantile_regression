@@ -106,11 +106,16 @@ def read_data(path: str, label_column: str = None, header: int = 0, balance: boo
         print("Balancing dataset")
         train_df = rebalance(train_df, label_column)
 
-    y = train_df[label_column]
-    y_test = test_df[label_column]
+    # label_column=label_column.split(",")
+    
+    y = train_df[[label_column]]
+    y_test = test_df[[label_column]]
     train_df.drop(label_column, axis=1, inplace=True)
     test_df.drop(label_column, axis=1, inplace=True)
 
+
+    print(train_df.columns,test_df.columns)
+    print(y.columns,y_test.columns)
     if categorize:
         y_train = to_categorical(np.array(y))
         y_test = to_categorical(np.array(y_test))
